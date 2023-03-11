@@ -10,7 +10,9 @@ import sys
 import time
 import traceback
 import urllib.parse
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import browser_cookie3
 import requests
@@ -295,6 +297,25 @@ def download_album(_album_url: str, _attempt: int = 1) -> None:
             time.sleep(CONFIG["POST_DOWNLOAD_WAIT"])
 
 
+def unzip_archive(file_path: str):
+    if not str(file_path).endswith(".zip"):
+        return
+
+    try:
+        p = Path(file_path)
+        parent_dir = p.parent.absolute()
+        file_name = p.stem
+        output_path = Path(parent_dir) / file_name
+        if not output_path:
+            raise ValueError("Invalid path")
+
+        with zipfile.ZipFile(file_path, "r") as zip_ref:
+            zip_ref.extractall(output_path)
+    except Exception as e:
+        print(f"Could not unzip: {file_path}")
+        print(e)
+
+
 def download_file(_url: str, _track_info: dict = None, _attempt: int = 1) -> None:
     try:
         with requests.get(
@@ -359,6 +380,7 @@ def download_file(_url: str, _track_info: dict = None, _attempt: int = 1) -> Non
                         actual_size, expected_size
                     )
                 )
+            unzip_archive(file_path)
     except IOError as e:
         if _attempt < CONFIG["MAX_URL_ATTEMPTS"]:
             if CONFIG["VERBOSE"] >= 2:
