@@ -14,7 +14,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 import browser_cookie3
 import requests
-
 # These require pip installs
 from bs4 import BeautifulSoup, SoupStrainer
 from tqdm import tqdm
@@ -23,7 +22,7 @@ USER_URL = "https://bandcamp.com/{}"
 COLLECTION_POST_URL = "https://bandcamp.com/api/fancollection/1/collection_items"
 FILENAME_REGEX = re.compile("filename\\*=UTF-8''(.*)")
 WINDOWS_DRIVE_REGEX = re.compile(r"[a-zA-Z]:\\")
-SANATIZE_PATH_WINDOWS_REGEX = re.compile(r'[<>:"/|?*]')
+SANITIZE_PATH_WINDOWS_REGEX = re.compile(r'[<>:"/|?*]')
 CONFIG = {
     "VERBOSE": False,
     "OUTPUT_DIR": None,
@@ -52,9 +51,13 @@ SUPPORTED_BROWSERS = ["firefox", "chrome", "chromium", "brave", "opera", "edge"]
 TRACK_INFO_KEYS = ["item_id", "artist", "title"]
 
 
-def main() -> int:
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Download your collection from bandcamp. Requires a logged in session in a supported browser so that the browser cookies can be used to authenticate with bandcamp. Albums are saved into directories named after their artist. Already existing albums will have their file size compared to what is expected and re-downloaded if the sizes differ. Otherwise already existing albums will not be re-downloaded."
+        description="Download your collection from bandcamp. Requires a logged in session in a supported "
+        "browser so that the browser cookies can be used to authenticate with bandcamp. Albums "
+        "are saved into directories named after their artist. Already existing albums will have "
+        "their file size compared to what is expected and re-downloaded if the sizes differ. Otherwise "
+        "already existing albums will not be re-downloaded."
     )
     parser.add_argument("username", type=str, help="Your bandcamp username")
     parser.add_argument(
@@ -91,9 +94,9 @@ def main() -> int:
         "-p",
         type=int,
         default=DEFAULT_THREADS,
-        help="How many threads to use for parallel downloads. Set to '1' to disable parallelism. Default is 5. Must be between 1 and {}".format(
-            MAX_THREADS
-        ),
+        help="How many threads to use for parallel downloads. "
+        "Set to '1' to disable parallelism. Default is 5. "
+        "Must be between 1 and {}".format(MAX_THREADS),
     )
     parser.add_argument(
         "--force",
@@ -105,7 +108,8 @@ def main() -> int:
         "--wait-after-download",
         type=float,
         default=1,
-        help="How long, in seconds, to wait after successfully completing a download before downloading the next file. Defaults to '1'.",
+        help="How long, in seconds, to wait after successfully completing a "
+        "download before downloading the next file. Defaults to '1'.",
     )
     parser.add_argument(
         "--max-download-attempts",
@@ -155,7 +159,8 @@ def main() -> int:
         )
     if not links:
         print(
-            "WARN: No album links found for user [{}]. Are you logged in and have you selected the correct browser to pull cookies from?".format(
+            "WARN: No album links found for user [{}]. Are you logged in "
+            "and have you selected the correct browser to pull cookies from?".format(
                 args.username
             )
         )
@@ -173,7 +178,7 @@ def main() -> int:
     print("Done.")
 
 
-def generate_collection_post_payload(_user_info: dict) -> None:
+def generate_collection_post_payload(_user_info: dict) -> dict:
     return {
         "fan_id": _user_info["user_id"],
         "count": _user_info["collection_count"] - len(_user_info["download_urls"]),
@@ -214,8 +219,8 @@ def get_download_links_for_user(_user: str) -> [str]:
         "collection_count": data["collection_count"],
         "user_id": data["fan_data"]["fan_id"],
         "last_token": data["collection_data"]["last_token"],
+        "download_urls": [*data["collection_data"]["redownload_urls"].values()],
     }
-    user_info["download_urls"] = [*data["collection_data"]["redownload_urls"].values()]
 
     get_user_collection(user_info)
     return user_info["download_urls"]
@@ -240,7 +245,7 @@ def download_album(_album_url: str, _attempt: int = 1) -> None:
         data = json.loads(html.unescape(div.get("data-blob")))
         album = data["download_items"][0]["title"]
 
-        if not "downloads" in data["download_items"][0]:
+        if "downloads" not in data["download_items"][0]:
             CONFIG["TQDM"].write(
                 "WARN: Album [{}] at url [{}] has no downloads available.".format(
                     album, _album_url
@@ -248,7 +253,7 @@ def download_album(_album_url: str, _attempt: int = 1) -> None:
             )
             return
 
-        if not CONFIG["FORMAT"] in data["download_items"][0]["downloads"]:
+        if CONFIG["FORMAT"] not in data["download_items"][0]["downloads"]:
             CONFIG["TQDM"].write(
                 "WARN: Album [{}] at url [{}] does not have a download for format [{}].".format(
                     album, _album_url, CONFIG["FORMAT"]
@@ -392,7 +397,7 @@ def sanitize_path(_path: str) -> str:
         if WINDOWS_DRIVE_REGEX.match(_path):
             new_path += _path[0:3]
             search_path = _path[3:]
-        new_path += SANATIZE_PATH_WINDOWS_REGEX.sub("-", search_path)
+        new_path += SANITIZE_PATH_WINDOWS_REGEX.sub("-", search_path)
         return new_path
     return _path
 
@@ -407,7 +412,7 @@ def get_cookies():
         func = getattr(browser_cookie3, CONFIG["BROWSER"])
         return func(domain_name="bandcamp.com")
     except AttributeError:
-        raise Exception(
+        raise RuntimeError(
             "Browser type [{}] is unknown. Can't pull cookies, so can't authenticate with bandcamp.".format(
                 CONFIG["BROWSER"]
             )
